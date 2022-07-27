@@ -27,8 +27,11 @@ prost = "0.10.1"
 log = "0.4.14"
 tokio-stream = "0.1.8"
 serde_json = "1.0.82"
+serde = "1.0.140"
+serde_derive = "1.0.140"
 tungstenite = {version = "0.16.0", features = ["native-tls"]}
 url = "2.2.2"
+lazy_static = "1.4.0"
 
 [build-dependencies]
 tonic-build= "0.7.2"

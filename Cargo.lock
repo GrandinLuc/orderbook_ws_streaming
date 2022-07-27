@@ -454,8 +454,11 @@ checksum = "112c678d4050afce233f4f2852bb2eb519230b3cf12f33585275537d7e41578d"
 name = "keyrock"
 version = "0.1.0"
 dependencies = [
+ "lazy_static",
  "log",
  "prost",
+ "serde",
+ "serde_derive",
  "serde_json",
  "tokio",
  "tokio-stream",
@@ -902,6 +905,17 @@ name = "serde"
 version = "1.0.140"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc855a42c7967b7c369eb5860f7164ef1f6f81c20c7cc1141f2a604e18723b03"
+
+[[package]]
+name = "serde_derive"
+version = "1.0.140"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f2122636b9fe3b81f1cb25099fcf2d3f542cdb1d45940d56c713158884a05da"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "serde_json"
