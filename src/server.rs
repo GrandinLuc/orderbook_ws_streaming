@@ -1,19 +1,15 @@
-use log::{debug, error, info};
+use log::{debug};
 use serde_derive::{Deserialize, Serialize};
 use std::pin::Pin;
-use std::thread;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio_stream::StreamExt;
-use tungstenite::connect;
-use url::Url;
 
 use tonic::codegen::futures_core::Stream;
 use tonic::{transport::Server, Request, Response, Status};
 
 use orderbook::orderbook_aggregator_server::{OrderbookAggregator, OrderbookAggregatorServer};
 
-use orderbook::{Empty, Level, Summary};
+use orderbook::{Empty, Summary};
 pub mod binance;
 pub mod bitstamp;
 use binance::update_data_binance;

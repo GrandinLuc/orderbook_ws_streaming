@@ -1,9 +1,6 @@
-use serde_derive::{Deserialize, Serialize};
-
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Empty {
 }
-#[derive(Serialize, Deserialize)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Summary {
     #[prost(double, tag="1")]
@@ -13,7 +10,6 @@ pub struct Summary {
     #[prost(message, repeated, tag="3")]
     pub asks: ::prost::alloc::vec::Vec<Level>,
 }
-#[derive(Serialize, Deserialize)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Level {
     #[prost(string, tag="1")]

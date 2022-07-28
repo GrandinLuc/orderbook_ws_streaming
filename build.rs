@@ -1,5 +1,3 @@
-use std::{env, path::PathBuf};
-
 fn main() {
     let proto_file = "./proto/orderbook.proto";
 

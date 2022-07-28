@@ -11,13 +11,6 @@ path = "src/server.rs"
 name = "grpc-client"
 path = "src/client.rs"
 
-[[bin]]
-name = "binance"
-path = "src/binance.rs"
-
-[[bin]]
-name = "bitstamp"
-path = "src/bitstamp.rs"
 
 
 [dependencies]

@@ -18,7 +18,6 @@ struct ApiResult {
     bids: Vec<[String; 2]>,
     asks: Vec<[String; 2]>,
 }
-fn main() {}
 
 pub async fn update_data_binance(tx: Sender<Result<Summary, Status>>) {
     let (mut socket, _response) =

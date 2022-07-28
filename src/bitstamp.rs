@@ -24,7 +24,6 @@ struct ApiResult {
     channel: String,
     event: String,
 }
-fn main() {}
 
 pub async fn update_data_bitstamp(tx: Sender<Result<Summary, Status>>) {
     let (mut socket, _response) =
