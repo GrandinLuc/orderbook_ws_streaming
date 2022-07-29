@@ -38,15 +38,18 @@ impl Default for MyApp {
 
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let y = (10i32).pow(7) as f64;
+
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Orderbook application");
-            ui.label(format!("The spread: {}", &mut self.data.lock().unwrap().spread.to_string()));
+            ui.label(format!("The spread: {}", (self.data.lock().unwrap().spread * y).round() / y));
 
             ui.heading("The asks (top) and bids (bottom): ");
             for i in &mut self.data.lock().unwrap().asks.iter().rev() {
                 ui.horizontal(|ui| {
                     ui.label(i.price.to_string());
                     ui.label(i.amount.to_string());
+                    ui.label(i.exchange.to_string());
                 });
             }
             ui.label("----------------------------");
@@ -54,6 +57,7 @@ impl eframe::App for MyApp {
                 ui.horizontal(|ui| {
                     ui.label(i.price.to_string());
                     ui.label(i.amount.to_string());
+                    ui.label(i.exchange.to_string());
                 });
             }
         });
