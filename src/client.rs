@@ -1,14 +1,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-use eframe::egui::InnerResponse;
-use eframe::egui::Response;
 use orderbook::Summary;
 // hide console window on Windows in release
 use orderbook::orderbook_aggregator_client::OrderbookAggregatorClient;
 use tonic::IntoRequest;
 use tonic::Request;
 use eframe::egui;
-use crate::orderbook::Level;
-use std::thread;
 
 use std::sync::{ Arc, Mutex };
 
@@ -43,10 +39,10 @@ impl Default for MyApp {
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("My egui Application");
+            ui.heading("Orderbook application");
             ui.label(format!("The spread: {}", &mut self.data.lock().unwrap().spread.to_string()));
 
-            ui.heading("The asks and bids: ");
+            ui.heading("The asks (top) and bids (bottom): ");
             for i in &mut self.data.lock().unwrap().asks.iter().rev() {
                 ui.horizontal(|ui| {
                     ui.label(i.price.to_string());

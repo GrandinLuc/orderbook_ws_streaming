@@ -13,3 +13,7 @@ Run the client
 ```bash
 cargo run --bin grpc-client
 ```
+
+A screenshot of the client:
+
+![](Capture.png)
