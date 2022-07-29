@@ -8,6 +8,9 @@ use tonic::IntoRequest;
 use tonic::Request;
 use eframe::egui;
 use crate::orderbook::Level;
+use std::thread;
+
+use std::sync::{ Arc, Mutex };
 
 mod orderbook {
     include!("orderbook.rs");
@@ -19,27 +22,21 @@ impl IntoRequest<orderbook::Empty> for Request<()> {
     }
 }
 
-
-
 struct MyApp {
-    spread: f64,
-    asks: Vec<Level>,
-    bids: Vec<Level>,
+    data: Arc<Mutex<Summary>>,
 }
 
 impl Default for MyApp {
     fn default() -> Self {
         Self {
-            spread: 0.0,
-            asks: vec![],
-            bids: vec![],
+            data: Arc::new(
+                Mutex::new(Summary {
+                    spread: 0.0,
+                    asks: vec![],
+                    bids: vec![],
+                })
+            ),
         }
-    }
-}
-
-impl MyApp {
-    fn set_data(message: Summary) -> Self {
-        Self { spread: message.spread, asks: message.asks, bids: message.bids }
     }
 }
 
@@ -47,17 +44,17 @@ impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("My egui Application");
-            ui.label(format!("The spread: {}", &mut self.spread.to_string()));
+            ui.label(format!("The spread: {}", &mut self.data.lock().unwrap().spread.to_string()));
 
             ui.heading("The asks and bids: ");
-            for i in &mut self.asks.iter().rev() {
+            for i in &mut self.data.lock().unwrap().asks.iter().rev() {
                 ui.horizontal(|ui| {
                     ui.label(i.price.to_string());
                     ui.label(i.amount.to_string());
                 });
             }
             ui.label("----------------------------");
-            for i in &mut self.bids {
+            for i in &mut self.data.lock().unwrap().bids {
                 ui.horizontal(|ui| {
                     ui.label(i.price.to_string());
                     ui.label(i.amount.to_string());
@@ -73,18 +70,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let options = eframe::NativeOptions::default();
     let mut client = OrderbookAggregatorClient::connect("http://127.0.0.1:50051").await?;
 
-    loop {
-        let request = tonic::Request::new(());
+    let app = MyApp::default();
 
-        let response = client.book_summary(request).await?;
+    let updating_data = app.data.clone();
 
-        let mut inner_response = response.into_inner();
+    tokio::spawn(async move {
+        loop {
+            let request = tonic::Request::new(());
 
-        let message = inner_response.message().await?.unwrap();
-        eframe::run_native(
-            "Orderbook visualizer",
-            options,
-            Box::new(|_cc| Box::new(MyApp::set_data(message)))
-        );
-    }
+            let response = client.book_summary(request).await.unwrap();
+
+            let mut inner_response = response.into_inner();
+
+            let message = inner_response.message().await.unwrap().unwrap();
+
+            *updating_data.lock().unwrap() = message;
+        }
+    });
+
+    eframe::run_native(
+        "Orderbook visualizer",
+        options,
+        Box::new(|_cc| Box::new(app))
+    );
 }
