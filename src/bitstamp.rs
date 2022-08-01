@@ -1,14 +1,16 @@
-use serde_derive::{Deserialize, Serialize};
+use serde_derive::{ Deserialize, Serialize };
 use serde_json::json;
 use tokio::sync::mpsc::Sender;
 use tonic::Status;
-use tungstenite::{connect, Message};
+use tungstenite::{ connect, Message };
 use url::Url;
+use std::sync::{ Arc };
+use futures::lock::Mutex;
 
 mod orderbook {
     include!("orderbook.rs");
 }
-use crate::orderbook::{Level, Summary};
+use crate::orderbook::{ Level, Summary };
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Data {
@@ -25,20 +27,20 @@ struct ApiResult {
     event: String,
 }
 
-pub async fn update_data_bitstamp(tx: Sender<Result<Summary, Status>>) {
-    let (mut socket, _response) =
-        connect(Url::parse("wss://ws.bitstamp.net").unwrap()).expect("Can't connect");
+pub async fn update_data_bitstamp(data: &Arc<Mutex<Summary>>) {
+    let (mut socket, _response) = connect(Url::parse("wss://ws.bitstamp.net").unwrap()).expect(
+        "Can't connect"
+    );
 
-    let request = json!({
+    let request =
+        json!({
         "event": "bts:subscribe",
         "data": {
             "channel": "order_book_ethbtc"
         }
     });
 
-    socket
-        .write_message(Message::Text(serde_json::to_string(&request).unwrap()))
-        .unwrap();
+    socket.write_message(Message::Text(serde_json::to_string(&request).unwrap())).unwrap();
 
     loop {
         let msg = socket.read_message().expect("Error reading message");
@@ -53,9 +55,9 @@ pub async fn update_data_bitstamp(tx: Sender<Result<Summary, Status>>) {
 
             match parsed {
                 Ok(parsed) => {
-                    tx.send(Ok(Summary {
-                        spread: parsed.data.asks[0][0].parse::<f64>().unwrap()
-                            - parsed.data.bids[0][0].parse::<f64>().unwrap(),
+                    let new_data: Summary = Summary {
+                        spread: parsed.data.asks[0][0].parse::<f64>().unwrap() -
+                        parsed.data.bids[0][0].parse::<f64>().unwrap(),
                         bids: parsed.data.bids[0..10]
                             .into_iter()
                             .map(|x| Level {
@@ -72,9 +74,9 @@ pub async fn update_data_bitstamp(tx: Sender<Result<Summary, Status>>) {
                                 amount: x[1].parse::<f64>().unwrap(),
                             })
                             .collect(),
-                    }))
-                    .await
-                    .unwrap();
+                    };
+
+                    *data.lock().await = new_data;
                 }
                 Err(parsed) => {
                     println!("Failed to fetch data: {:?}", parsed);

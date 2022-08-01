@@ -1,14 +1,16 @@
-use serde_derive::{Deserialize, Serialize};
+use serde_derive::{ Deserialize, Serialize };
 use tungstenite::connect;
 use url::Url;
-
+use std::{ error::Error };
+use std::sync::{ Arc };
+use futures::lock::Mutex;
 use tokio::sync::mpsc::Sender;
 use tonic::Status;
 
 mod orderbook {
     include!("orderbook.rs");
 }
-use crate::orderbook::{Level, Summary};
+use crate::orderbook::{ Level, Summary };
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -19,10 +21,10 @@ struct ApiResult {
     asks: Vec<[String; 2]>,
 }
 
-pub async fn update_data_binance(tx: Sender<Result<Summary, Status>>) {
-    let (mut socket, _response) =
-        connect(Url::parse("wss://stream.binance.com:9443/ws/ethbtc@depth20@100ms").unwrap())
-            .expect("Can't connect");
+pub async fn update_data_binance(data: &Arc<Mutex<Summary>>) {
+    let (mut socket, _response) = connect(
+        Url::parse("wss://stream.binance.com:9443/ws/ethbtc@depth20@100ms").unwrap()
+    ).expect("Can't connect");
 
     loop {
         let msg = socket.read_message().expect("Error reading message");
@@ -31,36 +33,36 @@ pub async fn update_data_binance(tx: Sender<Result<Summary, Status>>) {
             _ => String::from(""),
         };
 
-        if msg != String::from("") {
-            let parsed: Result<ApiResult, serde_json::Error> = serde_json::from_str(&msg);
+        let parsed: Result<ApiResult, serde_json::Error> = serde_json::from_str(&msg);
 
-            match parsed {
-                Ok(parsed) => tx
-                    .send(Ok(Summary {
-                        spread: parsed.asks[0][0].parse::<f64>().unwrap()
-                            - parsed.bids[0][0].parse::<f64>().unwrap(),
-                        bids: parsed.bids[0..10]
-                            .into_iter()
-                            .map(|x| Level {
-                                exchange: String::from("Binance"),
-                                price: x[0].parse::<f64>().unwrap(),
-                                amount: x[1].parse::<f64>().unwrap(),
-                            })
-                            .collect(),
-                        asks: parsed.asks[0..10]
-                            .into_iter()
-                            .map(|x| Level {
-                                exchange: String::from("Binance"),
-                                price: x[0].parse::<f64>().unwrap(),
-                                amount: x[1].parse::<f64>().unwrap(),
-                            })
-                            .collect(),
-                    }))
-                    .await
-                    .unwrap(),
-                Err(parsed) => {
-                    panic!("Error: {:?}", parsed);
-                }
+        match parsed {
+            Ok(parsed) => {
+                let new_data = Summary {
+                    spread: parsed.asks[0][0].parse::<f64>().unwrap() -
+                    parsed.bids[0][0].parse::<f64>().unwrap(),
+                    bids: parsed.bids[0..10]
+                        .into_iter()
+                        .map(|x| Level {
+                            exchange: String::from("Binance"),
+                            price: x[0].parse::<f64>().unwrap(),
+                            amount: x[1].parse::<f64>().unwrap(),
+                        })
+                        .collect(),
+                    asks: parsed.asks[0..10]
+                        .into_iter()
+                        .map(|x| Level {
+                            exchange: String::from("Binance"),
+                            price: x[0].parse::<f64>().unwrap(),
+                            amount: x[1].parse::<f64>().unwrap(),
+                        })
+                        .collect(),
+                };
+
+                *data.lock().await = new_data;
+            }
+
+            Err(parsed) => {
+                println!("Error: {:?}", parsed);
             }
         }
     }

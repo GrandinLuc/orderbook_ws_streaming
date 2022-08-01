@@ -1,15 +1,16 @@
-use log::{debug};
-use serde_derive::{Deserialize, Serialize};
+use log::{ debug };
+use serde_derive::{ Deserialize, Serialize };
 use std::pin::Pin;
 use tokio::sync::mpsc;
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::{ Receiver, Sender };
+use std::sync::{ Arc };
+use futures::lock::Mutex;
 
 use tonic::codegen::futures_core::Stream;
-use tonic::{transport::Server, Request, Response, Status};
+use tonic::{ transport::Server, Request, Response, Status };
+use orderbook::orderbook_aggregator_server::{ OrderbookAggregator, OrderbookAggregatorServer };
 
-use orderbook::orderbook_aggregator_server::{OrderbookAggregator, OrderbookAggregatorServer};
-
-use orderbook::{Empty, Summary};
+use orderbook::{ Empty, Summary };
 pub mod binance;
 pub mod bitstamp;
 use binance::update_data_binance;
@@ -43,21 +44,31 @@ struct ApiResultBitstamp {
     event: String,
 }
 
-pub trait RemoveFirst<T> {
-    fn remove_first(&mut self) -> Option<T>;
+pub struct OrderbookAggregatorImpl {
+    data_binance: Arc<Mutex<Summary>>,
+    data_bitstamp: Arc<Mutex<Summary>>,
 }
 
-impl<T> RemoveFirst<T> for Vec<T> {
-    fn remove_first(&mut self) -> Option<T> {
-        if self.is_empty() {
-            return None;
+impl Default for OrderbookAggregatorImpl {
+    fn default() -> Self {
+        Self {
+            data_binance: Arc::from(
+                Mutex::new(Summary {
+                    spread: 0.0,
+                    bids: vec![],
+                    asks: vec![],
+                })
+            ),
+            data_bitstamp: Arc::from(
+                Mutex::new(Summary {
+                    spread: 0.0,
+                    bids: vec![],
+                    asks: vec![],
+                })
+            ),
         }
-        Some(self.remove(0))
     }
 }
-
-#[derive(Default)]
-pub struct OrderbookAggregatorImpl {}
 
 #[tonic::async_trait]
 impl OrderbookAggregator for OrderbookAggregatorImpl {
@@ -65,15 +76,11 @@ impl OrderbookAggregator for OrderbookAggregatorImpl {
 
     async fn book_summary(
         &self,
-        request: Request<Empty>,
+        request: Request<Empty>
     ) -> Result<Response<Self::BookSummaryStream>, Status> {
         debug!("Got a request: {:?}", request);
 
         let (tx, rx) = mpsc::channel(10);
-        let (tx_binance, mut rx_binance): (Sender<Result<Summary, Status>>, Receiver<_>) =
-            mpsc::channel(11);
-        let (tx_bitstamp, mut rx_bitstamp): (Sender<Result<Summary, Status>>, Receiver<_>) =
-            mpsc::channel(12);
 
         let mut orders = Summary {
             spread: 0.0,
@@ -81,72 +88,53 @@ impl OrderbookAggregator for OrderbookAggregatorImpl {
             asks: vec![],
         };
 
-        // Binance
-        tokio::spawn(async move {
-            update_data_binance(tx_binance).await;
-        });
+        let data_binance = self.data_binance.clone();
+        let data_bitstamp = self.data_bitstamp.clone();
 
-        // Bitstamp
-        tokio::spawn(async move {
-            update_data_bitstamp(tx_bitstamp).await;
-        });
-
-        let mut binance_data = rx_binance.recv().await.unwrap().unwrap();
-        let mut bitstamp_data = rx_bitstamp.recv().await.unwrap().unwrap();
-
-
+        let mut binance_data = data_binance.lock().await;
+        let mut bitstamp_data = data_bitstamp.lock().await;
 
         while bitstamp_data.asks.len() == 0 || binance_data.asks.len() == 0 {
             if bitstamp_data.asks.len() == 0 {
-                
-                println!("Waiting for Bitstamp data");
-                bitstamp_data = rx_bitstamp.recv().await.unwrap().unwrap();
-            }
-            else if binance_data.asks.len() == 0 {
-                println!("Waiting for Binance data");
-            binance_data = rx_binance.recv().await.unwrap().unwrap();
+                bitstamp_data = data_bitstamp.lock().await;
+            } else if binance_data.asks.len() == 0 {
+                binance_data = data_binance.lock().await;
             }
         }
 
-        println!("Bitstamp data: {:?} ", bitstamp_data );
-
         while binance_data.asks.len() > 0 || bitstamp_data.asks.len() > 0 {
             if binance_data.asks.len() == 0 {
-                orders.asks.push(bitstamp_data.asks.remove(0))
+                orders.asks.push(bitstamp_data.asks.remove(0));
             } else if bitstamp_data.asks.len() == 0 {
-                orders.asks.push(binance_data.asks.remove(0))
+                orders.asks.push(binance_data.asks.remove(0));
             } else {
                 if bitstamp_data.asks[0].price > binance_data.asks[0].price {
-                    orders.asks.push(binance_data.asks.remove(0))
+                    orders.asks.push(binance_data.asks.remove(0));
                 } else {
-                    orders.asks.push(bitstamp_data.asks.remove(0))
+                    orders.asks.push(bitstamp_data.asks.remove(0));
                 }
             }
         }
 
         while binance_data.bids.len() > 0 || bitstamp_data.bids.len() > 0 {
             if binance_data.bids.len() == 0 {
-                orders.bids.push(bitstamp_data.bids.remove(0))
+                orders.bids.push(bitstamp_data.bids.remove(0));
             } else if bitstamp_data.asks.len() == 0 {
-                orders.bids.push(binance_data.bids.remove(0))
+                orders.bids.push(binance_data.bids.remove(0));
             } else {
                 if bitstamp_data.bids[0].price < binance_data.bids[0].price {
-                    orders.bids.push(binance_data.bids.remove(0))
+                    orders.bids.push(binance_data.bids.remove(0));
                 } else {
-                    orders.bids.push(bitstamp_data.bids.remove(0))
+                    orders.bids.push(bitstamp_data.bids.remove(0));
                 }
             }
         }
 
         orders.spread = orders.asks[0].price - orders.bids[0].price;
-        
-
 
         tx.send(Ok(orders)).await.unwrap();
 
-        Ok(Response::new(Box::pin(
-            tokio_stream::wrappers::ReceiverStream::new(rx),
-        )))
+        Ok(Response::new(Box::pin(tokio_stream::wrappers::ReceiverStream::new(rx))))
     }
 }
 
@@ -155,12 +143,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "0.0.0.0:50051".parse().unwrap();
     let orderbook = OrderbookAggregatorImpl::default();
 
+    let data_binance = orderbook.data_binance.clone();
+    let data_bitstamp = orderbook.data_bitstamp.clone();
+
+    // Binance
+    tokio::spawn(async move {
+        loop {
+            update_data_binance(&data_binance).await;
+        }
+    });
+
+    // Bitstamp
+    tokio::spawn(async move {
+        loop {
+            update_data_bitstamp(&data_bitstamp).await;
+        }
+    });
+
     println!("Orderbook server listening on {}", addr);
 
-    Server::builder()
-        .add_service(OrderbookAggregatorServer::new(orderbook))
-        .serve(addr)
-        .await?;
+    Server::builder().add_service(OrderbookAggregatorServer::new(orderbook)).serve(addr).await?;
 
     Ok(())
 }
