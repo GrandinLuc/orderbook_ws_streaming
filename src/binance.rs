@@ -6,6 +6,9 @@ use std::sync::{ Arc };
 use futures::lock::Mutex;
 use tokio::sync::mpsc::Sender;
 use tonic::Status;
+use tokio::sync::RwLock;
+
+use std::{ thread, time };
 
 mod orderbook {
     include!("orderbook.rs");
@@ -21,7 +24,7 @@ struct ApiResult {
     asks: Vec<[String; 2]>,
 }
 
-pub async fn update_data_binance(data: &Arc<Mutex<Summary>>) {
+pub async fn update_data_binance(data: &Arc<RwLock<Summary>>) {
     let (mut socket, _response) = connect(
         Url::parse("wss://stream.binance.com:9443/ws/ethbtc@depth20@100ms").unwrap()
     ).expect("Can't connect");
@@ -58,7 +61,7 @@ pub async fn update_data_binance(data: &Arc<Mutex<Summary>>) {
                         .collect(),
                 };
 
-                *data.lock().await = new_data;
+                *data.write().await = new_data;
             }
 
             Err(parsed) => {

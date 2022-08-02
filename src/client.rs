@@ -1,10 +1,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+use futures::StreamExt;
 use orderbook::Summary;
 // hide console window on Windows in release
 use orderbook::orderbook_aggregator_client::OrderbookAggregatorClient;
 use tonic::IntoRequest;
 use tonic::Request;
 use eframe::egui;
+
+use std::{ thread, time };
 
 use std::sync::{ Arc, Mutex };
 
@@ -73,19 +76,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let updating_data = app.data.clone();
 
+    let request = tonic::Request::new(());
+
+    let response = client.book_summary(request).await.unwrap();
+
+    let mut inner_response_stream = response.into_inner();
+
     tokio::spawn(async move {
         loop {
-            let request = tonic::Request::new(());
-
-            let response = client.book_summary(request).await.unwrap();
-
-            let mut inner_response = response.into_inner();
-
-            let message = inner_response.message().await.unwrap().unwrap();
-
-            println!("The message looks like this: {:?}", message);
-
-            *updating_data.lock().unwrap() = message;
+            match inner_response_stream.next().await {
+                Some(next_message) => {
+                    // println!("The message looks like this: {:?}", next_message);
+                    *updating_data.lock().unwrap() = next_message.unwrap();
+                }
+                None => {
+                    println!("No next message");
+                }
+            }
         }
     });
 

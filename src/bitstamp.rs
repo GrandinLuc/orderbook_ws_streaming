@@ -6,11 +6,13 @@ use tungstenite::{ connect, Message };
 use url::Url;
 use std::sync::{ Arc };
 use futures::lock::Mutex;
+use tokio::sync::RwLock;
 
 mod orderbook {
     include!("orderbook.rs");
 }
 use crate::orderbook::{ Level, Summary };
+use std::{ thread, time };
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Data {
@@ -27,7 +29,7 @@ struct ApiResult {
     event: String,
 }
 
-pub async fn update_data_bitstamp(data: &Arc<Mutex<Summary>>) {
+pub async fn update_data_bitstamp(data: &Arc<RwLock<Summary>>) {
     let (mut socket, _response) = connect(Url::parse("wss://ws.bitstamp.net").unwrap()).expect(
         "Can't connect"
     );
@@ -76,7 +78,7 @@ pub async fn update_data_bitstamp(data: &Arc<Mutex<Summary>>) {
                             .collect(),
                     };
 
-                    *data.lock().await = new_data;
+                    *data.write().await = new_data;
                 }
                 Err(parsed) => {
                     println!("Failed to fetch data: {:?}", parsed);
