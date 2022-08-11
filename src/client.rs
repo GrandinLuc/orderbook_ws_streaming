@@ -7,8 +7,6 @@ use tonic::IntoRequest;
 use tonic::Request;
 use eframe::egui;
 
-use std::{ thread, time };
-
 use std::sync::{ Arc, Mutex };
 
 mod orderbook {

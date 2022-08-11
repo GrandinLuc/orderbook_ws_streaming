@@ -1,5 +1,5 @@
 [package]
-name = "keyrock"
+name = "orderbook_ws_streaming"
 version = "0.1.0"
 edition = "2021"
 

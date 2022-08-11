@@ -1,11 +1,8 @@
-use log::{ debug };
 use serde_derive::{ Deserialize, Serialize };
 use std::pin::Pin;
 use tokio::sync::{ mpsc, RwLock };
-use tokio::sync::mpsc::{ Receiver, Sender };
-use tokio_stream::{ wrappers::ReceiverStream, StreamExt };
+use tokio_stream::{ StreamExt };
 use std::sync::{ Arc };
-use futures::lock::Mutex;
 
 use tonic::codegen::futures_core::Stream;
 use tonic::{ transport::Server, Request, Response, Status };
@@ -79,7 +76,7 @@ impl OrderbookAggregator for OrderbookAggregatorImpl {
 
     async fn book_summary(
         &self,
-        request: Request<Empty>
+        _request: Request<Empty>
     ) -> Result<Response<Self::BookSummaryStream>, Status> {
         let (tx, rx) = mpsc::channel(100);
 
@@ -94,7 +91,7 @@ impl OrderbookAggregator for OrderbookAggregatorImpl {
         let data_bitstamp = self.data_bitstamp.clone();
 
         tokio::spawn(async move {
-            while let Some(item) = stream.next().await {
+            while let Some(_item) = stream.next().await {
                 let mut orders = Summary {
                     spread: 0.0,
                     bids: vec![],

@@ -1039,25 +1039,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "keyrock"
-version = "0.1.0"
-dependencies = [
- "eframe",
- "futures",
- "log",
- "prost",
- "serde",
- "serde_derive",
- "serde_json",
- "tokio",
- "tokio-stream",
- "tonic",
- "tonic-build",
- "tungstenite",
- "url",
-]
-
-[[package]]
 name = "khronos_api"
 version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1431,6 +1412,25 @@ dependencies = [
  "libc",
  "pkg-config",
  "vcpkg",
+]
+
+[[package]]
+name = "orderbook_ws_streaming"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "futures",
+ "log",
+ "prost",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tonic-build",
+ "tungstenite",
+ "url",
 ]
 
 [[package]]
